@@ -1,6 +1,7 @@
 
 /* Dicky - public domain */
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
@@ -74,6 +75,20 @@ static int lolfsm_round(LOLFSM * const fsm, int c)
     lolfsm_reset(fsm);
     
     return (int) lookup(c);
+}
+
+static int init_input_buffer(InputBuffer * const input_buffer,
+                             const unsigned char *buffer,
+                             const size_t sizeof_buffer)
+{
+    assert(input_buffer != NULL);
+    assert(sizeof_buffer > (size_t) 0U);
+    input_buffer->buffer = buffer;
+    input_buffer->pos = (size_t) 0U;    
+    input_buffer->sizeof_buffer = sizeof_buffer;
+    input_buffer->quartet = 0;
+    
+    return 0;
 }
 
 static int init_output_buffer(OutputBuffer * const output_buffer,
@@ -150,6 +165,12 @@ static int pad_output_buffer(OutputBuffer * const output_buffer)
     return emit(output_buffer, C_SPACE);
 }
 
+static int get_quartet_from_input_buffer(InputBuffer * const input_buffer)
+{
+    (void) input_buffer;
+    assert("Unimplemented" == NULL);
+}
+
 static int unhold(OutputBuffer * const output_buffer,
                   const char * const start_held,
                   const char * const end_held)
@@ -208,6 +229,32 @@ int dicky_compress(unsigned char ** const target, size_t * const target_size,
         return -1;
     }
     *target = output_buffer.buffer;
+    *target_size = output_buffer.pos;
+    
+    return 0;
+}
+
+int dicky_uncompress(char ** const target, size_t * const target_size,
+                     const unsigned char * const source,
+                     const size_t source_size)
+{
+    InputBuffer input_buffer;    
+    OutputBuffer output_buffer;
+    int c;
+
+    *target = NULL;
+    *target_size = (size_t) 0U;
+    if (init_input_buffer(&input_buffer, source, source_size) != 0) {
+        return -1;
+    }    
+    if (init_output_buffer(&output_buffer,
+                           source_size * (size_t) AVG_COMPRESSION_RATIO) != 0) {
+        return -1;
+    }
+    while ((c = get_quartet_from_input_buffer(&input_buffer)) != EOF) {
+        
+    }
+    *target = (char *) output_buffer.buffer;
     *target_size = output_buffer.pos;
     
     return 0;
