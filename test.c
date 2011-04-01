@@ -17,7 +17,9 @@ int main(void)
     char *uncompressed;
     size_t uncompressed_size;
 
+#ifndef __linux__
     srandomdev();
+#endif
     dicky_compress(&compressed, &compressed_size, STR, strlen(STR));
     dicky_uncompress(&uncompressed, &uncompressed_size,
                      compressed, compressed_size);
