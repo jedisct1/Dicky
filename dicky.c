@@ -202,6 +202,11 @@ static int unhold(OutputBuffer * const output_buffer,
     return 0;
 }
 
+static unsigned int get_rand(unsigned int max)
+{
+    return (unsigned int) (random() % (long) max);
+}
+
 int dicky_compress(unsigned char ** const target, size_t * const target_size,
                    const char * const source, const size_t source_size)
 {
@@ -227,10 +232,11 @@ int dicky_compress(unsigned char ** const target, size_t * const target_size,
                 pnt_held = pnt_source;
             }
         } else {
-            if (pnt_held != NULL) {
+            if (pnt_held != NULL && compressed_char != C_LOL &&
+                compressed_char != C_MDR && compressed_char != C_BITE) {
                 unhold(&output_buffer, pnt_held, pnt_source);
-                pnt_held = NULL;
             }
+            pnt_held = NULL;            
             if (emit(&output_buffer, (unsigned char) compressed_char) != 0) {
                 free_output_buffer(&output_buffer);
                 return -1;
@@ -248,6 +254,30 @@ int dicky_compress(unsigned char ** const target, size_t * const target_size,
     return 0;
 }
 
+static int uncompress_special(OutputBuffer * const output_buffer, const int c)
+{
+    if (c == C_LOL) {
+        append_byte_to_output_buffer(output_buffer, 'L');
+        append_byte_to_output_buffer(output_buffer, 'O');
+        append_byte_to_output_buffer(output_buffer, 'L');
+        return 1;
+    }
+    if (c == C_MDR) {
+        append_byte_to_output_buffer(output_buffer, 'M');
+        append_byte_to_output_buffer(output_buffer, 'D');
+        append_byte_to_output_buffer(output_buffer, 'R');
+        return 1;
+    }
+    if (c == C_BITE) {
+        append_byte_to_output_buffer(output_buffer, 'b');
+        append_byte_to_output_buffer(output_buffer, 'i');
+        append_byte_to_output_buffer(output_buffer, 't');
+        append_byte_to_output_buffer(output_buffer, 'e');            
+        return 1;
+    }
+    return 0;
+}
+
 int dicky_uncompress(char ** const target, size_t * const target_size,
                      const unsigned char * const source,
                      const size_t source_size)
@@ -255,6 +285,9 @@ int dicky_uncompress(char ** const target, size_t * const target_size,
     InputBuffer input_buffer;    
     OutputBuffer output_buffer;
     int c;
+    int uncompressed_char;
+    const unsigned char *row;
+    signed char seen_space;
 
     *target = NULL;
     *target_size = (size_t) 0U;
@@ -266,7 +299,46 @@ int dicky_uncompress(char ** const target, size_t * const target_size,
         return -1;
     }
     while ((c = get_quartet_from_input_buffer(&input_buffer)) != EOF) {
-
+        if (uncompress_special(&output_buffer, c) != 0) {
+            continue;
+        }
+        if (c == C_SPACE) {
+            if (seen_space != 0) {
+                switch ((int) get_rand(5U)) {
+                case 0:
+                    append_byte_to_output_buffer(&output_buffer, '\n');
+                    break;
+                case 1:
+                    append_byte_to_output_buffer(&output_buffer, '.');
+                    append_byte_to_output_buffer(&output_buffer, '.');
+                    append_byte_to_output_buffer(&output_buffer, '.');
+                    append_byte_to_output_buffer(&output_buffer, ' ');
+                    break;
+                case 2:
+                    append_byte_to_output_buffer(&output_buffer, ' ');
+                    break;
+                case 3:
+                    append_byte_to_output_buffer(&output_buffer, '!');
+                    append_byte_to_output_buffer(&output_buffer, ' ');                    
+                    break;
+                case 4:
+                    append_byte_to_output_buffer(&output_buffer, '.');
+                    append_byte_to_output_buffer(&output_buffer, ' ');                    
+                    break;
+                }
+                seen_space = 0;
+                continue;
+            } else {
+                uncompressed_char = ' ';
+                seen_space = 1;                
+            }
+        } else {
+            seen_space = 0;
+            row = dtable[c];
+            uncompressed_char =
+                row[get_rand((unsigned int) strlen((const char *) row))];
+        }
+        append_byte_to_output_buffer(&output_buffer, uncompressed_char);
     }
     *target = (char *) output_buffer.buffer;
     *target_size = output_buffer.pos;
@@ -274,7 +346,7 @@ int dicky_uncompress(char ** const target, size_t * const target_size,
     return 0;
 }
 
-void dicky_free(unsigned char * const buffer)
+void dicky_free(void * const buffer)
 {
     free(buffer);
 }

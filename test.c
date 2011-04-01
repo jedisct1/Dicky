@@ -16,10 +16,10 @@ int main(void)
     size_t uncompressed_size;
     
     dicky_compress(&compressed, &compressed_size, STR, strlen(STR));
-    dicky_free(compressed);
-    assert(compressed_size == (size_t) 15U);
     dicky_uncompress(&uncompressed, &uncompressed_size,
                      compressed, compressed_size);
+    dicky_free(compressed);
+    dicky_free(uncompressed);
     
     return 0;
 }

@@ -11,7 +11,7 @@ int dicky_uncompress(char ** const target, size_t * const target_size,
                      const unsigned char * const source,
                      const size_t source_size);
 
-void dicky_free(unsigned char * const buffer);
+void dicky_free(void * const buffer);
 
 #endif
 
