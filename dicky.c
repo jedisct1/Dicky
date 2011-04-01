@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 #include <assert.h>
 #include "dicky_p.h"
 #include "dicky.h"
@@ -117,10 +118,15 @@ static int append_byte_to_output_buffer(OutputBuffer * const output_buffer,
                                         const unsigned char c)
 {
     if (output_buffer->pos >= output_buffer->sizeof_buffer) {
-        const size_t wanted_size =
-            output_buffer->sizeof_buffer + output_buffer->chunk_size;
-        unsigned char * const new_buffer =
-            realloc(output_buffer->buffer, wanted_size);
+        size_t wanted_size;
+        unsigned char *new_buffer;
+        
+        if (SIZE_T_MAX - output_buffer->chunk_size <
+            output_buffer->sizeof_buffer) {
+            return -1;
+        }
+        wanted_size = output_buffer->sizeof_buffer + output_buffer->chunk_size;
+        new_buffer = realloc(output_buffer->buffer, wanted_size);
         if (new_buffer == NULL) {
             return -1;
         }
