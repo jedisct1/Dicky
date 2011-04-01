@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include <assert.h>
 #include "dicky.h"
 
@@ -14,7 +15,8 @@ int main(void)
     size_t compressed_size;
     char *uncompressed;
     size_t uncompressed_size;
-    
+
+    srandomdev();
     dicky_compress(&compressed, &compressed_size, STR, strlen(STR));
     dicky_uncompress(&uncompressed, &uncompressed_size,
                      compressed, compressed_size);
