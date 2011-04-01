@@ -7,7 +7,8 @@
 #include <assert.h>
 #include "dicky.h"
 
-#define STR "Kikou, tu veux voir ma bite ?"
+#define STR "\x4b\x69\x6b\x6f\x75\x20\x74\x75\x20\x76\x65\x75\x78\x20\x76"
+            "\x6f\x69\x72\x20\x6d\x61\x20\x62\x69\x74\x65"
 
 int main(void)
 {
