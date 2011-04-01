@@ -17,6 +17,12 @@ Dicky is widely used inside Skyrock, in everything from blog to chat
 (but it used to be a manual process, previously been referred to as
 "kikoulol" in some presentations and the likes).
 
+Caveats
+-------
+
+Dicky only handles ISO-8859-1 encoded text.
+UTF-8 is still being evaluated.
+
 API
 ---
 
