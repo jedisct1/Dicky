@@ -287,7 +287,7 @@ int dicky_uncompress(char ** const target, size_t * const target_size,
     int c;
     int uncompressed_char;
     const unsigned char *row;
-    signed char seen_space;
+    signed char seen_space = 0;
 
     *target = NULL;
     *target_size = (size_t) 0U;
