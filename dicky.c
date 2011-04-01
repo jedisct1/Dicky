@@ -159,9 +159,7 @@ static int append_quartet_to_output_buffer(OutputBuffer * const output_buffer,
 
 static int emit(OutputBuffer * const output_buffer, const unsigned char c)
 {
-    append_quartet_to_output_buffer(output_buffer, c);
-    
-    return 0;
+    return append_quartet_to_output_buffer(output_buffer, c);
 }
 
 static int pad_output_buffer(OutputBuffer * const output_buffer)
@@ -263,23 +261,75 @@ int dicky_compress(unsigned char ** const target, size_t * const target_size,
 static int uncompress_special(OutputBuffer * const output_buffer, const int c)
 {
     if (c == C_LOL) {
-        append_byte_to_output_buffer(output_buffer, 'L');
-        append_byte_to_output_buffer(output_buffer, 'O');
-        append_byte_to_output_buffer(output_buffer, 'L');
+        if (append_byte_to_output_buffer(output_buffer, 'L') != 0 ||
+            append_byte_to_output_buffer(output_buffer, 'O') != 0 ||
+            append_byte_to_output_buffer(output_buffer, 'L') != 0) {
+            return -1;
+        }
         return 1;
     }
     if (c == C_MDR) {
-        append_byte_to_output_buffer(output_buffer, 'M');
-        append_byte_to_output_buffer(output_buffer, 'D');
-        append_byte_to_output_buffer(output_buffer, 'R');
+        if (append_byte_to_output_buffer(output_buffer, 'M') != 0 ||
+            append_byte_to_output_buffer(output_buffer, 'D') != 0 ||
+            append_byte_to_output_buffer(output_buffer, 'R') != 0) {
+            return -1;
+        }
         return 1;
     }
     if (c == C_BITE) {
-        append_byte_to_output_buffer(output_buffer, 'b');
-        append_byte_to_output_buffer(output_buffer, 'i');
-        append_byte_to_output_buffer(output_buffer, 't');
-        append_byte_to_output_buffer(output_buffer, 'e');            
+        if (append_byte_to_output_buffer(output_buffer, 'b') != 0 ||
+            append_byte_to_output_buffer(output_buffer, 'i') != 0 ||
+            append_byte_to_output_buffer(output_buffer, 't') != 0 ||
+            append_byte_to_output_buffer(output_buffer, 'e') != 0) {
+            return -1;
+        }
         return 1;
+    }
+    return 0;
+}
+
+static int uncompress_space(OutputBuffer * const output_buffer,
+                            signed char * const seen_space,
+                            int * const uncompressed_char)
+{
+    if (*seen_space != 0) {
+        switch ((int) get_rand(5U)) {
+        case 0:
+            if (append_byte_to_output_buffer(output_buffer, '\n') != 0) {
+                return -1;
+            }
+            break;
+        case 1:
+            if (append_byte_to_output_buffer(output_buffer, '.') != 0 ||
+                append_byte_to_output_buffer(output_buffer, '.') != 0 ||
+                append_byte_to_output_buffer(output_buffer, '.') != 0 ||
+                append_byte_to_output_buffer(output_buffer, ' ') != 0) {
+                return -1;
+            }
+            break;
+        case 2:
+            if (append_byte_to_output_buffer(output_buffer, ' ') != 0) {
+                return -1;
+            }
+            break;
+        case 3:
+            if (append_byte_to_output_buffer(output_buffer, '!') != 0 ||
+                append_byte_to_output_buffer(output_buffer, ' ') != 0) {
+                return -1;
+            }
+            break;
+        case 4:
+            if (append_byte_to_output_buffer(output_buffer, '.') != 0 ||
+                append_byte_to_output_buffer(output_buffer, ' ') != 0) {
+                return -1;
+            }
+        }
+        *seen_space = 0;
+        
+        return 1;
+    } else {
+        *uncompressed_char = ' ';
+        *seen_space = 1;                
     }
     return 0;
 }
@@ -291,6 +341,7 @@ int dicky_uncompress(char ** const target, size_t * const target_size,
     InputBuffer input_buffer;    
     OutputBuffer output_buffer;
     int c;
+    int ret;
     int uncompressed_char;
     const unsigned char *row;
     signed char seen_space = 0;
@@ -300,43 +351,26 @@ int dicky_uncompress(char ** const target, size_t * const target_size,
     if (init_input_buffer(&input_buffer, source, source_size) != 0) {
         return -1;
     }    
-    if (init_output_buffer(&output_buffer,
-                           source_size * (size_t) AVG_COMPRESSION_RATIO) != 0) {
+    if (init_output_buffer(&output_buffer, source_size *
+                           (size_t) AVG_COMPRESSION_RATIO) != 0) {
         return -1;
     }
     while ((c = get_quartet_from_input_buffer(&input_buffer)) != EOF) {
-        if (uncompress_special(&output_buffer, c) != 0) {
+        ret = uncompress_special(&output_buffer, c);
+        if (ret < 0) {
+            return -1;
+        }
+        if (ret > 0) {
             continue;
         }
         if (c == C_SPACE) {
-            if (seen_space != 0) {
-                switch ((int) get_rand(5U)) {
-                case 0:
-                    append_byte_to_output_buffer(&output_buffer, '\n');
-                    break;
-                case 1:
-                    append_byte_to_output_buffer(&output_buffer, '.');
-                    append_byte_to_output_buffer(&output_buffer, '.');
-                    append_byte_to_output_buffer(&output_buffer, '.');
-                    append_byte_to_output_buffer(&output_buffer, ' ');
-                    break;
-                case 2:
-                    append_byte_to_output_buffer(&output_buffer, ' ');
-                    break;
-                case 3:
-                    append_byte_to_output_buffer(&output_buffer, '!');
-                    append_byte_to_output_buffer(&output_buffer, ' ');                    
-                    break;
-                case 4:
-                    append_byte_to_output_buffer(&output_buffer, '.');
-                    append_byte_to_output_buffer(&output_buffer, ' ');                    
-                    break;
-                }
-                seen_space = 0;
+            ret = uncompress_space(&output_buffer, &seen_space,
+                                   &uncompressed_char);
+            if (ret < 0) {
+                return -1;
+            }
+            if (ret > 0) {
                 continue;
-            } else {
-                uncompressed_char = ' ';
-                seen_space = 1;                
             }
         } else {
             seen_space = 0;
@@ -344,7 +378,10 @@ int dicky_uncompress(char ** const target, size_t * const target_size,
             uncompressed_char =
                 row[get_rand((unsigned int) strlen((const char *) row))];
         }
-        append_byte_to_output_buffer(&output_buffer, uncompressed_char);
+        if (append_byte_to_output_buffer(&output_buffer,
+                                         uncompressed_char) != 0) {
+            return -1;
+        }
     }
     *target = (char *) output_buffer.buffer;
     *target_size = output_buffer.pos;
