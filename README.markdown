@@ -7,7 +7,7 @@ Blurb
 
 Dicky is a compression/decompression library.
 
-It doesn't not aim for compatibility with anything you would read in a
+It does not aim for compatibility with anything you would read in a
 textbook; instead, it aims for being highly optimized for skyrock.com content.
 
 It's not designed to be machine-readable, but focuses on being readable by
