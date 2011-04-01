@@ -1,0 +1,219 @@
+
+/* Dicky - public domain */
+
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+#include "dicky_p.h"
+#include "dicky.h"
+
+static void lolfsm_reset(LOLFSM * const fsm)
+{
+    memset(fsm, 0, sizeof *fsm);
+}
+
+static unsigned char lookup(const int c)
+{
+    assert((size_t) c < sizeof ctable / sizeof ctable[0]);
+    
+    return (unsigned char) ctable[(size_t) c];   
+}
+
+static int lolfsm_round(LOLFSM * const fsm, int c)
+{
+    switch (c) {
+    case 'l':
+        if (fsm->seen_o) {
+            lolfsm_reset(fsm);
+            return C_LOL;
+        }
+        fsm->seen_l = 1;
+        return C_HOLD;
+    case 'o':
+        if (fsm->seen_l) {
+            fsm->seen_o = 1;
+            return C_HOLD;
+        }
+        break;
+    case 'm':
+        fsm->seen_m = 1;
+        return C_HOLD;
+    case 'd':
+        if (fsm->seen_m) {
+            fsm->seen_d = 1;
+            return C_HOLD;
+        }
+        break;
+    case 'r':
+        if (fsm->seen_d) {
+            lolfsm_reset(fsm);
+            return C_MDR;            
+        }
+        break;
+    case 'b':
+        fsm->seen_b = 1;
+        return C_HOLD;
+    case 'i':
+        if (fsm->seen_b) {
+            fsm->seen_i = 1;
+            return C_HOLD;
+        }
+        break;
+    case 't':
+        if (fsm->seen_i) {
+            fsm->seen_t = 1;
+            return C_HOLD;
+        }
+        break;
+    case 'e':
+        if (fsm->seen_t) {
+            lolfsm_reset(fsm);
+            return C_BITE;            
+        }
+    }
+    lolfsm_reset(fsm);
+    
+    return (int) lookup(c);
+}
+
+static int init_output_buffer(OutputBuffer * const output_buffer,
+                              const size_t chunk_size)
+{
+    assert(chunk_size > (size_t) 0U);
+    output_buffer->buffer = NULL;
+    output_buffer->pos = (size_t) 0U;
+    output_buffer->sizeof_buffer = (size_t) 0U;
+    output_buffer->chunk_size = chunk_size;
+    output_buffer->quartet = 0;
+    
+    return 0;
+}
+
+static void free_output_buffer(OutputBuffer * const output_buffer)
+{
+    if (output_buffer == NULL) {
+        return;
+    }
+    free(output_buffer->buffer);
+    output_buffer->buffer = NULL;
+}
+
+static int append_byte_to_output_buffer(OutputBuffer * const output_buffer,
+                                        const unsigned char c)
+{
+    if (output_buffer->pos >= output_buffer->sizeof_buffer) {
+        const size_t wanted_size =
+            output_buffer->sizeof_buffer + output_buffer->chunk_size;
+        unsigned char * const new_buffer =
+            realloc(output_buffer->buffer, wanted_size);
+        if (new_buffer == NULL) {
+            return -1;
+        }
+        output_buffer->buffer = new_buffer;
+        output_buffer->sizeof_buffer = wanted_size;
+    }
+    assert(output_buffer->pos < output_buffer->sizeof_buffer);
+    output_buffer->buffer[output_buffer->pos++] = c;
+    
+    return 0;
+}
+
+static int append_quartet_to_output_buffer(OutputBuffer * const output_buffer,
+                                           const unsigned char c)
+{
+    assert(c <= 0x1F);
+    if (output_buffer->quartet != 0) {
+        assert((output_buffer->buffer[output_buffer->pos] & 0x1F) == 0U);
+        output_buffer->buffer[output_buffer->pos] |= c;
+        output_buffer->quartet = 0;
+    } else {
+        if (append_byte_to_output_buffer(output_buffer, c << 4) != 0) {
+            return -1;
+        }
+        output_buffer->quartet = 1;
+    }
+    return 0;
+}
+
+static int emit(OutputBuffer * const output_buffer, const unsigned char c)
+{
+    append_quartet_to_output_buffer(output_buffer, c);
+    
+    return 0;
+}
+
+static int pad_output_buffer(OutputBuffer * const output_buffer)
+{
+    if (output_buffer->quartet == 0) {
+        return 0;
+    }
+    return emit(output_buffer, C_SPACE);
+}
+
+static int unhold(OutputBuffer * const output_buffer,
+                  const char * const start_held,
+                  const char * const end_held)
+{
+    const char *pnt_held = start_held;
+    
+    assert(start_held != NULL);
+    assert(start_held != end_held);
+    do {
+        if (emit(output_buffer, lookup(*pnt_held)) != 0) {
+            return -1;
+        }
+    } while (++pnt_held != end_held);
+       
+    return 0;
+}
+
+int dicky_compress(unsigned char ** const target, size_t * const target_size,
+                   const char * const source, const size_t source_size)
+{
+    const char *pnt_source = source;
+    const char * const end_source = pnt_source + source_size;
+    const char *pnt_held = NULL;
+    OutputBuffer output_buffer;
+    LOLFSM fsm;
+    int compressed_char;
+    int c;
+
+    *target = NULL;
+    *target_size = (size_t) 0U;
+    if (init_output_buffer(&output_buffer, source_size) != 0) {
+        return -1;
+    }
+    lolfsm_reset(&fsm);
+    while (pnt_source != end_source) {
+        c = (int) (unsigned char) *pnt_source;
+        compressed_char = lolfsm_round(&fsm, c);
+        if (compressed_char == C_HOLD) {
+            if (pnt_held == NULL) {
+                pnt_held = pnt_source;
+            }
+        } else {
+            if (pnt_held != NULL) {
+                unhold(&output_buffer, pnt_held, pnt_source);
+                pnt_held = NULL;
+            }
+            if (emit(&output_buffer, (unsigned char) compressed_char) != 0) {
+                free_output_buffer(&output_buffer);
+                return -1;
+            }
+        }
+        pnt_source++;
+    }
+    if (pad_output_buffer(&output_buffer) != 0) {
+        free_output_buffer(&output_buffer);
+        return -1;
+    }
+    *target = output_buffer.buffer;
+    *target_size = output_buffer.pos;
+    
+    return 0;
+}
+
+void dicky_free(unsigned char * const buffer)
+{
+    free(buffer);
+}
