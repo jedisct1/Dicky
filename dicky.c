@@ -136,10 +136,11 @@ static int append_byte_to_output_buffer(OutputBuffer * const output_buffer,
 static int append_quartet_to_output_buffer(OutputBuffer * const output_buffer,
                                            const unsigned char c)
 {
-    assert(c <= 0x1F);
+    assert(c <= 0xF);
     if (output_buffer->quartet != 0) {
-        assert((output_buffer->buffer[output_buffer->pos] & 0x1F) == 0U);
-        output_buffer->buffer[output_buffer->pos] |= c;
+        assert((output_buffer->buffer[output_buffer->pos] & 0xF) == 0U);
+        assert(output_buffer->pos > (size_t) 0U);
+        output_buffer->buffer[output_buffer->pos - (size_t) 1U] |= c;
         output_buffer->quartet = 0;
     } else {
         if (append_byte_to_output_buffer(output_buffer, c << 4) != 0) {
@@ -167,8 +168,21 @@ static int pad_output_buffer(OutputBuffer * const output_buffer)
 
 static int get_quartet_from_input_buffer(InputBuffer * const input_buffer)
 {
-    (void) input_buffer;
-    assert("Unimplemented" == NULL);
+    unsigned char c;
+    assert(input_buffer->pos <= input_buffer->sizeof_buffer);
+
+    if (input_buffer->pos >= input_buffer->sizeof_buffer) {
+        return EOF;
+    }
+    c = input_buffer->buffer[input_buffer->pos];
+    if (input_buffer->quartet == 0) {
+        input_buffer->quartet = 1;
+        return (int) ((c >> 4) & 0xF);
+    }
+    input_buffer->quartet = 0;
+    input_buffer->pos++;
+    
+    return (int) (c & 0xF);
 }
 
 static int unhold(OutputBuffer * const output_buffer,
@@ -252,7 +266,7 @@ int dicky_uncompress(char ** const target, size_t * const target_size,
         return -1;
     }
     while ((c = get_quartet_from_input_buffer(&input_buffer)) != EOF) {
-        
+
     }
     *target = (char *) output_buffer.buffer;
     *target_size = output_buffer.pos;
