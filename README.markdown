@@ -8,10 +8,10 @@ Blurb
 Dicky is a compression/decompression library.
 
 It does not aim for compatibility with anything you would read in a
-textbook; instead, it aims for being highly optimized for skyrock.com content.
+textbook; instead, it aims at being highly optimized for skyrock.com content.
 
-It's not designed to be machine-readable, but focuses on being readable by
-actual Skyrock users.
+It hasn't been designed to be machine-readable, but focuses on being
+readable by actual Skyrock users.
 
 Dicky is widely used inside Skyrock, in everything from blog to chat
 (but it used to be a manual process, previously been referred to as
